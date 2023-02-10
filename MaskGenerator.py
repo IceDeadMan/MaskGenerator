@@ -6,4 +6,4 @@ About: This is an implementation of a password mask generator proposed in my bac
 
 
 def main():
-    return
+    pass
