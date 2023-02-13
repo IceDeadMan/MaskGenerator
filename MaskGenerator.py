@@ -5,6 +5,7 @@ About: This is an implementation of a password mask generator proposed in my bac
 """
 
 import argparse
+import string
 
 class PasswordAnalyzer:
     '''Takes given arguments, filters and analyzes compatible passwords.'''
@@ -27,8 +28,10 @@ class PasswordAnalyzer:
 
         for filename in self.wordlists:
             try:
-                with open(filename, encoding="utf-8") as file:
+                with open(filename, 'r', encoding="latin-1") as file:
                     for password in file:
+
+                        password = password.rstrip('\r\n')
 
                         upper = 0
                         lower = 0
@@ -37,20 +40,20 @@ class PasswordAnalyzer:
                         mask = ""
 
                         for letter in password:
-                            if ord(letter) >= 97 and ord(letter) <= 122:
+                            if letter in string.ascii_lowercase:
                                 lower += 1
                                 mask += "?l"
-                            elif ord(letter) >= 65 and ord(letter) <= 90:
+                            elif letter in string.ascii_uppercase:
                                 upper += 1
                                 mask += "?u"
-                            elif ord(letter) >= 48 and ord(letter) <= 57:
+                            elif letter in string.digits:
                                 digits += 1
                                 mask += "?d"
-                            elif ord(letter) >= 32:
+                            else:
                                 special += 1
                                 mask += "?s"
 
-                        if (not self.minlength <= len(password.strip()) <= self.maxlength
+                        if (not self.minlength <= len(password) <= self.maxlength
                             or not self.minlower <= lower <= self.maxlower
                             or not self.minupper <= upper <= self.maxupper
                             or not self.mindigit <= digits <= self.maxdigit
@@ -65,8 +68,11 @@ class PasswordAnalyzer:
 
             except OSError:
                 pass
-        
-        print(self.masks)
+
+        sorted_by_occurrence = dict(sorted(self.masks.items(), key=lambda x:x[1], reverse=True))
+        for key in sorted_by_occurrence:
+            if sorted_by_occurrence[key] >= options.minocc:
+                print(key + ", " + str(sorted_by_occurrence[key]))
 
 
 if __name__ == "__main__":
@@ -93,6 +99,8 @@ if __name__ == "__main__":
                         default=0, help="Minimum number of special characters")
     parser.add_argument("--maxspecial", dest="maxspecial", type=int,
                         default=9999, help="Maximum number of special characters")
+    parser.add_argument("--minocc", dest="minocc", type=int,
+                        default=0, help="Minimum number of occurences of a mask")
     parser.add_argument("-w", "--wordlists", dest="wordlists", action="append",
                         help="Wordlists for analysis")
 
