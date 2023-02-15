@@ -86,6 +86,7 @@ class MaskSorter:
         self.sorting_mode = sorting_mode
         self.input_masks = input_masks
         self.mask_complexity = {}
+        self.sorted_masks = []
 
     def add_complexity(self):
         '''Iterate through input masks and evaluate its complexity'''
@@ -119,6 +120,13 @@ class MaskSorter:
 
         for mask in sorted_masks:
             print(mask, self.mask_complexity[mask])
+            self.sorted_masks.append(mask)
+
+    def save_masks_to_file(self, filename):
+        '''Save sorted masks to an output file'''
+        file = open(filename, "w", encoding="utf-8")
+        for mask in self.sorted_masks:
+            file.write(mask+"\n")
 
 
 if __name__ == "__main__":
@@ -149,6 +157,8 @@ if __name__ == "__main__":
                         default=0, help="Minimum number of occurences of a mask")
     parser.add_argument("--sorting", dest="sorting",
                         default="occurrence", help="Mask sorting mode")
+    parser.add_argument("--output", dest="output",
+                        default="defualt", help="Output file")
     parser.add_argument("-w", "--wordlists", dest="wordlists", action="append",
                         help="Wordlists for analysis")
 
@@ -164,3 +174,6 @@ if __name__ == "__main__":
 
     sorter = MaskSorter(options.sorting, masks)
     sorter.sort_masks()
+
+    if options.output != "default":
+        sorter.save_masks_to_file(options.output)
