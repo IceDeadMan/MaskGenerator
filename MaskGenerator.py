@@ -33,6 +33,9 @@ class PasswordAnalyzer:
 
                         password = password.rstrip('\r\n')
 
+                        if password == "":
+                            continue
+
                         upper = 0
                         lower = 0
                         digits = 0
@@ -105,8 +108,13 @@ class MaskSorter:
             self.mask_complexity.update({mask:{"occurrence":occurrence,
                                         "complexity":complexity, "optimal":complexity//occurrence}})
 
-    def sort_masks(self):
+    def sort_masks(self, input_options):
         '''Create sorted dictionary'''
+
+        capacity = None
+        if input_options.time != 0:
+            capacity = input_options.time * input_options.speed
+
         self.add_complexity()
         if self.sorting_mode == "occurrence":
             sorted_masks = dict(sorted(self.mask_complexity.items(),
@@ -119,6 +127,12 @@ class MaskSorter:
                                  key=lambda x:x[1][self.sorting_mode]))
 
         for mask in sorted_masks:
+            if capacity is not None:
+                if capacity - self.mask_complexity[mask]["complexity"] < 0:
+                    break
+                else:
+                    capacity -= self.mask_complexity[mask]["complexity"]
+
             print(mask, self.mask_complexity[mask])
             self.sorted_masks.append(mask)
 
@@ -155,6 +169,10 @@ if __name__ == "__main__":
                         default=9999, help="Maximum number of special characters")
     parser.add_argument("--minocc", dest="minocc", type=int,
                         default=0, help="Minimum number of occurences of a mask")
+    parser.add_argument("--time", dest="time", type=int,
+                        default=0, help="Time limit for cracking")
+    parser.add_argument("--speed", dest="speed", type=int,
+                        default=100000, help="Passwords generated per second")
     parser.add_argument("--sorting", dest="sorting",
                         default="occurrence", help="Mask sorting mode")
     parser.add_argument("--output", dest="output",
@@ -173,7 +191,7 @@ if __name__ == "__main__":
         print("No wordlists")
 
     sorter = MaskSorter(options.sorting, masks)
-    sorter.sort_masks()
+    sorter.sort_masks(options)
 
     if options.output != "default":
         sorter.save_masks_to_file(options.output)
