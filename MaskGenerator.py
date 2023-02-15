@@ -69,10 +69,56 @@ class PasswordAnalyzer:
             except OSError:
                 pass
 
-        sorted_by_occurrence = dict(sorted(self.masks.items(), key=lambda x:x[1], reverse=True))
-        for key in sorted_by_occurrence:
-            if sorted_by_occurrence[key] >= options.minocc:
-                print(key + ", " + str(sorted_by_occurrence[key]))
+        filtered_masks = {}
+        #sorted_by_occurrence = dict(sorted(self.masks.items(), key=lambda x:x[1], reverse=True))
+        for mask, occurrence in self.masks.items():
+            if occurrence >= options.minocc:
+                filtered_masks.update({mask:occurrence})
+
+        return filtered_masks
+
+class MaskSorter:
+    '''
+    Depending on the given sorting mode, sorts masks by their complexity, occurrence,
+    or their respective ratio in an optimal sorting
+    '''
+    def __init__(self, sorting_mode, input_masks):
+        self.sorting_mode = sorting_mode
+        self.input_masks = input_masks
+        self.mask_complexity = {}
+
+    def add_complexity(self):
+        '''Iterate through input masks and evaluate its complexity'''
+        for mask, occurrence in self.input_masks.items():
+            complexity = 1
+            for charset in mask.split('?'):
+                if charset == 'd':
+                    complexity *= len(string.digits)
+                elif charset == 'l':
+                    complexity *= len(string.ascii_lowercase)
+                elif charset == 'u':
+                    complexity *= len(string.ascii_uppercase)
+                elif charset == 's':
+                    complexity *= 33
+
+            self.mask_complexity.update({mask:{"occurrence":occurrence,
+                                        "complexity":complexity, "optimal":complexity//occurrence}})
+
+    def sort_masks(self):
+        '''Create sorted dictionary'''
+        self.add_complexity()
+        if self.sorting_mode == "occurrence":
+            sorted_masks = dict(sorted(self.mask_complexity.items(),
+                                 key=lambda x:x[1][self.sorting_mode], reverse=True))
+        elif self.sorting_mode == "complexity":
+            sorted_masks = dict(sorted(self.mask_complexity.items(),
+                                 key=lambda x:x[1][self.sorting_mode]))
+        elif self.sorting_mode == "optimal":
+            sorted_masks = dict(sorted(self.mask_complexity.items(),
+                                 key=lambda x:x[1][self.sorting_mode]))
+
+        for mask in sorted_masks:
+            print(mask, self.mask_complexity[mask])
 
 
 if __name__ == "__main__":
@@ -101,14 +147,20 @@ if __name__ == "__main__":
                         default=9999, help="Maximum number of special characters")
     parser.add_argument("--minocc", dest="minocc", type=int,
                         default=0, help="Minimum number of occurences of a mask")
+    parser.add_argument("--sorting", dest="sorting",
+                        default="occurrence", help="Mask sorting mode")
     parser.add_argument("-w", "--wordlists", dest="wordlists", action="append",
                         help="Wordlists for analysis")
 
     options = parser.parse_args()
+    masks = {}
 
     if options.wordlists is not None:
         analyzer = PasswordAnalyzer(options)
-        analyzer.analyze()
+        masks = analyzer.analyze()
 
     else:
         print("No wordlists")
+
+    sorter = MaskSorter(options.sorting, masks)
+    sorter.sort_masks()
