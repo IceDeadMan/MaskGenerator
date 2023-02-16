@@ -177,7 +177,7 @@ if __name__ == "__main__":
                         default="occurrence", help="Mask sorting mode")
     parser.add_argument("--output", dest="output",
                         default="defualt", help="Output file")
-    parser.add_argument("-w", "--wordlists", dest="wordlists", action="append",
+    parser.add_argument("-w", "--wordlists", dest="wordlists", nargs='*',
                         help="Wordlists for analysis")
 
     options = parser.parse_args()
