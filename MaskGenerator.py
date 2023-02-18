@@ -7,26 +7,25 @@ About: This is an implementation of a password mask generator proposed in my bac
 import argparse
 import string
 
+
+def check_compatibility(mask, mask_pattern):
+    '''Compare mask with a given mask pattern.'''
+    if len(mask) != len(mask_pattern):
+        return False
+    for i, letter in enumerate(mask):
+        if (mask_pattern[i] != '*' and mask_pattern[i] != letter):
+            return False
+    return True
+
 class PasswordAnalyzer:
     '''Takes given arguments, filters and analyzes compatible passwords.'''
-    def __init__(self, arg_options):
-        self.minlength = arg_options.minlength
-        self.minlower = arg_options.minlower
-        self.minupper = arg_options.minupper
-        self.mindigit = arg_options.mindigit
-        self.minspecial = arg_options.minspecial
-        self.maxlength = arg_options.maxlength
-        self.maxlower = arg_options.maxlower
-        self.maxupper = arg_options.maxupper
-        self.maxdigit = arg_options.maxdigit
-        self.maxspecial = arg_options.maxspecial
-        self.wordlists = arg_options.wordlists
+    def __init__(self):
         self.masks = {}
 
-    def analyze(self):
+    def analyze(self, arg_options):
         '''Iterate through passwords in wordlists and analyze passwords compatible with policy.'''
 
-        for filename in self.wordlists:
+        for filename in arg_options.wordlists:
             try:
                 with open(filename, 'r', encoding="latin-1") as file:
                     for password in file:
@@ -56,13 +55,19 @@ class PasswordAnalyzer:
                                 special += 1
                                 mask += "?s"
 
-                        if (not self.minlength <= len(password) <= self.maxlength
-                            or not self.minlower <= lower <= self.maxlower
-                            or not self.minupper <= upper <= self.maxupper
-                            or not self.mindigit <= digits <= self.maxdigit
-                            or not self.minspecial <= special <= self.maxspecial):
+                        if (not arg_options.minlength <= len(password) <= arg_options.maxlength
+                            or not arg_options.minlower <= lower <= arg_options.maxlower
+                            or not arg_options.minupper <= upper <= arg_options.maxupper
+                            or not arg_options.mindigit <= digits <= arg_options.maxdigit
+                            or not arg_options.minspecial <= special <= arg_options.maxspecial):
                             continue
 
+                        comp_count = 0
+                        for mask_pattern in arg_options.patterns:
+                            if check_compatibility(mask, mask_pattern):
+                                comp_count += 1
+                        if comp_count == 0:
+                            continue
 
                         if mask in self.masks:
                             self.masks[mask] += 1
@@ -75,7 +80,7 @@ class PasswordAnalyzer:
         filtered_masks = {}
         #sorted_by_occurrence = dict(sorted(self.masks.items(), key=lambda x:x[1], reverse=True))
         for mask, occurrence in self.masks.items():
-            if occurrence >= options.minocc:
+            if occurrence >= arg_options.minocc:
                 filtered_masks.update({mask:occurrence})
 
         return filtered_masks
@@ -176,16 +181,28 @@ if __name__ == "__main__":
     parser.add_argument("--sorting", dest="sorting",
                         default="occurrence", help="Mask sorting mode")
     parser.add_argument("--output", dest="output",
-                        default="defualt", help="Output file")
-    parser.add_argument("-w", "--wordlists", dest="wordlists", nargs='*',
+                        default="default", help="Output file")
+    parser.add_argument("--wordlists", dest="wordlists", nargs='*',
                         help="Wordlists for analysis")
+    parser.add_argument("--patterns", dest="patterns", nargs='*',
+                        help="Desired password mask patterns")
 
     options = parser.parse_args()
     masks = {}
 
+    if options.patterns is not None:
+        for pattern in options.patterns:
+            if not (options.minlower <= pattern.count("l") <= options.maxlower and
+                    options.minupper <= pattern.count("u") <= options.maxupper and
+                    options.mindigit <= pattern.count("d") <= options.maxdigit and
+                    options.minspecial <= pattern.count("s") <= options.maxspecial and
+                    options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
+                print("Arguments incompatible with pattern: " + str(pattern))
+                exit(1)
+
     if options.wordlists is not None:
-        analyzer = PasswordAnalyzer(options)
-        masks = analyzer.analyze()
+        analyzer = PasswordAnalyzer()
+        masks = analyzer.analyze(options)
 
     else:
         print("No wordlists")
