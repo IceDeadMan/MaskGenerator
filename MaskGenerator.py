@@ -6,6 +6,7 @@ About: This is an implementation of a password mask generator proposed in my bac
 
 import argparse
 import string
+import itertools
 
 
 def check_compatibility(mask, mask_pattern):
@@ -16,6 +17,16 @@ def check_compatibility(mask, mask_pattern):
         if (mask_pattern[i] != '*' and mask_pattern[i] != letter):
             return False
     return True
+
+def check_charsets(mask, arg_options):
+    '''Checks for required number of character sets within a mask.'''
+    if (arg_options.minlower <= mask.count("l") <= arg_options.maxlower and
+        arg_options.minupper <= mask.count("u") <= arg_options.maxupper and
+        arg_options.mindigit <= mask.count("d") <= arg_options.maxdigit and
+        arg_options.minspecial <= mask.count("s") <= arg_options.maxspecial):
+        return True
+    else:
+        return False
 
 class PasswordAnalyzer:
     '''Takes given arguments, filters and analyzes compatible passwords.'''
@@ -55,19 +66,17 @@ class PasswordAnalyzer:
                                 special += 1
                                 mask += "?s"
 
-                        if (not arg_options.minlength <= len(password) <= arg_options.maxlength
-                            or not arg_options.minlower <= lower <= arg_options.maxlower
-                            or not arg_options.minupper <= upper <= arg_options.maxupper
-                            or not arg_options.mindigit <= digits <= arg_options.maxdigit
-                            or not arg_options.minspecial <= special <= arg_options.maxspecial):
+                        if not (check_charsets(mask, arg_options) and
+                                arg_options.minlength <= len(password) <= arg_options.maxlength):
                             continue
 
-                        comp_count = 0
-                        for mask_pattern in arg_options.patterns:
-                            if check_compatibility(mask, mask_pattern):
-                                comp_count += 1
-                        if comp_count == 0:
-                            continue
+                        if arg_options.patterns is not None:
+                            comp_count = 0
+                            for mask_pattern in arg_options.patterns:
+                                if check_compatibility(mask, mask_pattern):
+                                    comp_count += 1
+                            if comp_count == 0:
+                                continue
 
                         if mask in self.masks:
                             self.masks[mask] += 1
@@ -78,7 +87,6 @@ class PasswordAnalyzer:
                 pass
 
         filtered_masks = {}
-        #sorted_by_occurrence = dict(sorted(self.masks.items(), key=lambda x:x[1], reverse=True))
         for mask, occurrence in self.masks.items():
             if occurrence >= arg_options.minocc:
                 filtered_masks.update({mask:occurrence})
@@ -147,13 +155,42 @@ class MaskSorter:
         for mask in self.sorted_masks:
             file.write(mask+"\n")
 
+class PasswordGenerator():
+    '''Generates masks based on given password policies.'''
+    def __init__(self):
+        self.charset = ["?l", "?u", "?d", "?s"]
+        self.masks = {}
+
+    def generate(self, arg_options):
+        '''Generate all compatible iterations of password masks.'''
+        for iteration in range(arg_options.minlength, arg_options.maxlength + 1):
+            for mask in itertools.product(self.charset, repeat=iteration):
+                joined_mask = ''.join(mask)
+
+                if not check_charsets(joined_mask, arg_options):
+                    continue
+
+                if arg_options.patterns is not None:
+                    comp_count = 0
+                    for mask_pattern in arg_options.patterns:
+                        if check_compatibility(joined_mask, mask_pattern):
+                            comp_count += 1
+                    if comp_count == 0:
+                        continue
+
+                if joined_mask in self.masks:
+                    self.masks[joined_mask] += 1
+                else:
+                    self.masks[joined_mask] = 1
+
+        return self.masks
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--minlength", dest="minlength", type=int,
-                        default=0, help="Minimum password length")
+                        default=1, help="Minimum password length")
     parser.add_argument("--maxlength", dest="maxlength", type=int,
                         default=9999, help="Maximum password length")
     parser.add_argument("--minlower", dest="minlower", type=int,
@@ -192,10 +229,7 @@ if __name__ == "__main__":
 
     if options.patterns is not None:
         for pattern in options.patterns:
-            if not (options.minlower <= pattern.count("l") <= options.maxlower and
-                    options.minupper <= pattern.count("u") <= options.maxupper and
-                    options.mindigit <= pattern.count("d") <= options.maxdigit and
-                    options.minspecial <= pattern.count("s") <= options.maxspecial and
+            if not (check_charsets(pattern, options) and
                     options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
                 print("Arguments incompatible with pattern: " + str(pattern))
                 exit(1)
@@ -205,7 +239,8 @@ if __name__ == "__main__":
         masks = analyzer.analyze(options)
 
     else:
-        print("No wordlists")
+        generator = PasswordGenerator()
+        masks = generator.generate(options)
 
     sorter = MaskSorter(options.sorting, masks)
     sorter.sort_masks(options)
