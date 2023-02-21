@@ -14,7 +14,9 @@ def check_compatibility(mask, mask_pattern):
     if len(mask) != len(mask_pattern):
         return False
     for i, letter in enumerate(mask):
-        if (mask_pattern[i] != '*' and mask_pattern[i] != letter):
+        if (mask_pattern[i] == 'a' and mask_pattern[i] == 'b'):
+            return False
+        if (mask_pattern[i] != 'b' and mask_pattern[i] != letter):
             return False
     return True
 
@@ -46,25 +48,19 @@ class PasswordAnalyzer:
                         if password == "":
                             continue
 
-                        upper = 0
-                        lower = 0
-                        digits = 0
-                        special = 0
                         mask = ""
 
                         for letter in password:
                             if letter in string.ascii_lowercase:
-                                lower += 1
                                 mask += "?l"
                             elif letter in string.ascii_uppercase:
-                                upper += 1
                                 mask += "?u"
                             elif letter in string.digits:
-                                digits += 1
                                 mask += "?d"
-                            else:
-                                special += 1
+                            elif letter in string.printable:
                                 mask += "?s"
+                            else:
+                                mask += "?b"
 
                         if not (check_charsets(mask, arg_options) and
                                 arg_options.minlength <= len(password) <= arg_options.maxlength):
@@ -146,7 +142,10 @@ class MaskSorter:
                 else:
                     capacity -= self.mask_complexity[mask]["complexity"]
 
-            print(mask, self.mask_complexity[mask])
+            if not input_options.quiet:
+                print(mask, self.mask_complexity[mask])
+            else:
+                print(mask)
             self.sorted_masks.append(mask)
 
     def save_masks_to_file(self, filename):
@@ -223,6 +222,8 @@ if __name__ == "__main__":
                         help="Wordlists for analysis")
     parser.add_argument("--patterns", dest="patterns", nargs='*',
                         help="Desired password mask patterns")
+    parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
+                        help="Print only masks without their attributes")
 
     options = parser.parse_args()
     masks = {}
