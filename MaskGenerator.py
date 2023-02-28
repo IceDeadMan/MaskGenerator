@@ -14,9 +14,10 @@ def check_compatibility(mask, mask_pattern):
     if len(mask) != len(mask_pattern):
         return False
     for i, letter in enumerate(mask):
-        if (mask_pattern[i] == 'a' and mask_pattern[i] == 'b'):
-            return False
-        if (mask_pattern[i] != 'b' and mask_pattern[i] != letter):
+        if mask_pattern[i] == 'a':
+            if mask_pattern[i] == 'b':
+                return False
+        elif (mask_pattern[i] != 'b' and mask_pattern[i] != letter):
             return False
     return True
 
@@ -66,12 +67,20 @@ class PasswordAnalyzer:
                                 arg_options.minlength <= len(password) <= arg_options.maxlength):
                             continue
 
-                        if arg_options.patterns is not None:
+                        if arg_options.patinc is not None:
                             comp_count = 0
-                            for mask_pattern in arg_options.patterns:
+                            for mask_pattern in arg_options.patinc:
                                 if check_compatibility(mask, mask_pattern):
                                     comp_count += 1
                             if comp_count == 0:
+                                continue
+
+                        if arg_options.patexc is not None:
+                            comp_count = 0
+                            for mask_pattern in arg_options.patexc:
+                                if check_compatibility(mask, mask_pattern):
+                                    comp_count += 1
+                            if comp_count != 0:
                                 continue
 
                         if mask in self.masks:
@@ -113,6 +122,8 @@ class MaskSorter:
                     complexity *= len(string.ascii_uppercase)
                 elif charset == 's':
                     complexity *= 33
+                elif charset == 'b':
+                    complexity *= 256
 
             self.mask_complexity.update({mask:{"occurrence":occurrence,
                                         "complexity":complexity, "optimal":complexity//occurrence}})
@@ -169,12 +180,20 @@ class PasswordGenerator():
                 if not check_charsets(joined_mask, arg_options):
                     continue
 
-                if arg_options.patterns is not None:
+                if arg_options.patinc is not None:
                     comp_count = 0
-                    for mask_pattern in arg_options.patterns:
+                    for mask_pattern in arg_options.patinc:
                         if check_compatibility(joined_mask, mask_pattern):
                             comp_count += 1
                     if comp_count == 0:
+                        continue
+
+                if arg_options.patexc is not None:
+                    comp_count = 0
+                    for mask_pattern in arg_options.patexc:
+                        if check_compatibility(joined_mask, mask_pattern):
+                            comp_count += 1
+                    if comp_count != 0:
                         continue
 
                 if joined_mask in self.masks:
@@ -220,16 +239,18 @@ if __name__ == "__main__":
                         default="default", help="Output file")
     parser.add_argument("--wordlists", dest="wordlists", nargs='*',
                         help="Wordlists for analysis")
-    parser.add_argument("--patterns", dest="patterns", nargs='*',
+    parser.add_argument("--patinc", dest="patinc", nargs='*',
                         help="Desired password mask patterns")
+    parser.add_argument("--patexc", dest="patexc", nargs='*',
+                        help="Password mask patterns to be excluded")
     parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
                         help="Print only masks without their attributes")
 
     options = parser.parse_args()
     masks = {}
 
-    if options.patterns is not None:
-        for pattern in options.patterns:
+    if options.patinc is not None:
+        for pattern in options.patinc:
             if not (check_charsets(pattern, options) and
                     options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
                 print("Arguments incompatible with pattern: " + str(pattern))
