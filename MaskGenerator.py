@@ -30,6 +30,16 @@ def check_charsets(mask, arg_options):
         return True
     else:
         return False
+    
+def check_custom_charsets(mask, arg_options):
+    '''Checks for undefined character sets within a mask.'''
+    if (arg_options.charset1 is None and "1" in mask or
+        arg_options.charset2 is None and "2" in mask or
+        arg_options.charset3 is None and "3" in mask or
+        arg_options.charset4 is None and "4" in mask):
+        return False
+    else:
+        return True
 
 class PasswordAnalyzer:
     '''Takes given arguments, filters and analyzes compatible passwords.'''
@@ -52,7 +62,15 @@ class PasswordAnalyzer:
                         mask = ""
 
                         for letter in password:
-                            if letter in string.ascii_lowercase:
+                            if arg_options.charset1 is not None and letter in arg_options.charset1:
+                                mask += "?1"
+                            elif arg_options.charset2 is not None and letter in arg_options.charset2:
+                                mask += "?2"
+                            elif arg_options.charset3 is not None and letter in arg_options.charset3:
+                                mask += "?3"
+                            elif arg_options.charset4 is not None and letter in arg_options.charset4:
+                                mask += "?4"
+                            elif letter in string.ascii_lowercase:
                                 mask += "?l"
                             elif letter in string.ascii_uppercase:
                                 mask += "?u"
@@ -109,12 +127,20 @@ class MaskSorter:
         self.mask_complexity = {}
         self.sorted_masks = []
 
-    def add_complexity(self):
+    def add_complexity(self, arg_options):
         '''Iterate through input masks and evaluate its complexity'''
         for mask, occurrence in self.input_masks.items():
             complexity = 1
             for charset in mask.split('?'):
-                if charset == 'd':
+                if charset == '1':
+                    complexity *= len(arg_options.charset1)
+                elif charset == '2':
+                    complexity *= len(arg_options.charset2)
+                elif charset == '3':
+                    complexity *= len(arg_options.charset3)
+                elif charset == '4':
+                    complexity *= len(arg_options.charset4)
+                elif charset == 'd':
                     complexity *= len(string.digits)
                 elif charset == 'l':
                     complexity *= len(string.ascii_lowercase)
@@ -135,7 +161,7 @@ class MaskSorter:
         if input_options.time != 0:
             capacity = input_options.time * input_options.speed
 
-        self.add_complexity()
+        self.add_complexity(options)
         if self.sorting_mode == "occurrence":
             sorted_masks = dict(sorted(self.mask_complexity.items(),
                                  key=lambda x:x[1][self.sorting_mode], reverse=True))
@@ -159,10 +185,18 @@ class MaskSorter:
                 print(mask)
             self.sorted_masks.append(mask)
 
-    def save_masks_to_file(self, filename):
+    def save_masks_to_file(self, arg_options):
         '''Save sorted masks to an output file'''
-        file = open(filename, "w", encoding="utf-8")
+        file = open(arg_options.output, "w", encoding="utf-8")
         for mask in self.sorted_masks:
+            if "1" in mask:
+                file.write(arg_options.charset1+",")
+            if "2" in mask:
+                file.write(arg_options.charset2+",")
+            if "3" in mask:
+                file.write(arg_options.charset3+",")
+            if "4" in mask:
+                file.write(arg_options.charset4+",")
             file.write(mask+"\n")
 
 class PasswordGenerator():
@@ -173,7 +207,16 @@ class PasswordGenerator():
 
     def generate(self, arg_options):
         '''Generate all compatible iterations of password masks.'''
-        for iteration in range(arg_options.minlength, arg_options.maxlength + 1):
+        if arg_options.charset1 is not None:
+            self.charset.append("?1")
+        if arg_options.charset2 is not None:
+            self.charset.append("?2")
+        if arg_options.charset3 is not None:
+            self.charset.append("?3")
+        if arg_options.charset4 is not None:
+            self.charset.append("?4")
+
+        for iteration in range(arg_options.minlength, 9 if arg_options.maxlength > 9 else arg_options.maxlength + 1):
             for mask in itertools.product(self.charset, repeat=iteration):
                 joined_mask = ''.join(mask)
 
@@ -243,6 +286,14 @@ if __name__ == "__main__":
                         help="Desired password mask patterns")
     parser.add_argument("--patexc", dest="patexc", nargs='*',
                         help="Password mask patterns to be excluded")
+    parser.add_argument("--charset1", dest="charset1",
+                        help="Custom character set number 1")
+    parser.add_argument("--charset2", dest="charset2",
+                        help="Custom character set number 2")
+    parser.add_argument("--charset3", dest="charset3",
+                        help="Custom character set number 3")
+    parser.add_argument("--charset4", dest="charset4",
+                        help="Custom character set number 4")
     parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
                         help="Print only masks without their attributes")
 
@@ -251,7 +302,14 @@ if __name__ == "__main__":
 
     if options.patinc is not None:
         for pattern in options.patinc:
-            if not (check_charsets(pattern, options) and
+            if not (check_charsets(pattern, options) and (check_custom_charsets(pattern, options)) and
+                    options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
+                print("Arguments incompatible with pattern: " + str(pattern))
+                exit(1)
+
+    if options.patexc is not None:
+        for pattern in options.patexc:
+            if not (check_charsets(pattern, options) and (check_custom_charsets(pattern, options)) and
                     options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
                 print("Arguments incompatible with pattern: " + str(pattern))
                 exit(1)
@@ -268,4 +326,4 @@ if __name__ == "__main__":
     sorter.sort_masks(options)
 
     if options.output != "default":
-        sorter.save_masks_to_file(options.output)
+        sorter.save_masks_to_file(options)
