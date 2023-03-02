@@ -7,6 +7,7 @@ About: This is an implementation of a password mask generator proposed in my bac
 import argparse
 import string
 import itertools
+import sys
 
 
 def check_compatibility(mask, mask_pattern):
@@ -30,7 +31,7 @@ def check_charsets(mask, arg_options):
         return True
     else:
         return False
-    
+
 def check_custom_charsets(mask, arg_options):
     '''Checks for undefined character sets within a mask.'''
     if (arg_options.charset1 is None and "1" in mask or
@@ -302,17 +303,17 @@ if __name__ == "__main__":
 
     if options.patinc is not None:
         for pattern in options.patinc:
-            if not (check_charsets(pattern, options) and (check_custom_charsets(pattern, options)) and
+            if not (check_charsets(pattern, options) and check_custom_charsets(pattern, options) and
                     options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
                 print("Arguments incompatible with pattern: " + str(pattern))
-                exit(1)
+                sys.exit(1)
 
     if options.patexc is not None:
         for pattern in options.patexc:
-            if not (check_charsets(pattern, options) and (check_custom_charsets(pattern, options)) and
+            if not (check_charsets(pattern, options) and check_custom_charsets(pattern, options) and
                     options.minlength <= len(pattern.replace('?', '')) <= options.maxlength):
                 print("Arguments incompatible with pattern: " + str(pattern))
-                exit(1)
+                sys.exit(1)
 
     if options.wordlists is not None:
         analyzer = PasswordAnalyzer()
