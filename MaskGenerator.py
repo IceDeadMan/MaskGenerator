@@ -50,6 +50,9 @@ class PasswordAnalyzer:
     def analyze(self, arg_options):
         '''Iterate through passwords in wordlists and analyze passwords compatible with policy.'''
 
+        lower_hex = list(set(string.hexdigits) - set(string.ascii_uppercase))
+        upper_hex = list(set(string.hexdigits) - set(string.ascii_lowercase))
+
         for filename in arg_options.wordlists:
             try:
                 with open(filename, 'r', encoding="latin-1") as file:
@@ -60,52 +63,73 @@ class PasswordAnalyzer:
                         if password == "":
                             continue
 
-                        mask = ""
+                        mask_buffer = []
 
                         for letter in password:
+
+                            charset_buffer = []
+
                             if arg_options.charset1 is not None and letter in arg_options.charset1:
-                                mask += "?1"
-                            elif arg_options.charset2 is not None and letter in arg_options.charset2:
-                                mask += "?2"
-                            elif arg_options.charset3 is not None and letter in arg_options.charset3:
-                                mask += "?3"
-                            elif arg_options.charset4 is not None and letter in arg_options.charset4:
-                                mask += "?4"
-                            elif letter in string.ascii_lowercase:
-                                mask += "?l"
-                            elif letter in string.ascii_uppercase:
-                                mask += "?u"
-                            elif letter in string.digits:
-                                mask += "?d"
-                            elif letter in string.printable:
-                                mask += "?s"
+                                charset_buffer.append("?1")
+                            if arg_options.charset2 is not None and letter in arg_options.charset2:
+                                charset_buffer.append("?2")
+                            if arg_options.charset3 is not None and letter in arg_options.charset3:
+                                charset_buffer.append("?3")
+                            if arg_options.charset4 is not None and letter in arg_options.charset4:
+                                charset_buffer.append("?4")
+                            if letter in lower_hex:
+                                charset_buffer.append("?h")
+                            if letter in upper_hex:
+                                charset_buffer.append("?H") 
+                            if letter in string.ascii_lowercase:
+                                charset_buffer.append("?l")
+                            if letter in string.ascii_uppercase:
+                                charset_buffer.append("?u")
+                            if letter in string.digits:
+                                charset_buffer.append("?d")
+                            if letter in string.punctuation:
+                                charset_buffer.append("?s")
+                            if len(charset_buffer) == 0:
+                                charset_buffer.append("?b")
+
+                            print(charset_buffer)
+
+                            if len(mask_buffer) == 0:
+                                for charset in charset_buffer:
+                                    mask_buffer.append(charset)
+
                             else:
-                                mask += "?b"
+                                tmp_buffer = []
+                                for mask in mask_buffer:
+                                    for charset in charset_buffer:
+                                        tmp_buffer.append(mask + charset)
+                                mask_buffer = tmp_buffer.copy()
 
-                        if not (check_charsets(mask, arg_options) and
-                                arg_options.minlength <= len(password) <= arg_options.maxlength):
-                            continue
-
-                        if arg_options.patinc is not None:
-                            comp_count = 0
-                            for mask_pattern in arg_options.patinc:
-                                if check_compatibility(mask, mask_pattern):
-                                    comp_count += 1
-                            if comp_count == 0:
+                        for mask in mask_buffer:
+                            if not (check_charsets(mask, arg_options) and
+                                    arg_options.minlength <= len(password) <= arg_options.maxlength):
                                 continue
 
-                        if arg_options.patexc is not None:
-                            comp_count = 0
-                            for mask_pattern in arg_options.patexc:
-                                if check_compatibility(mask, mask_pattern):
-                                    comp_count += 1
-                            if comp_count != 0:
-                                continue
+                            if arg_options.patinc is not None:
+                                comp_count = 0
+                                for mask_pattern in arg_options.patinc:
+                                    if check_compatibility(mask, mask_pattern):
+                                        comp_count += 1
+                                if comp_count == 0:
+                                    continue
 
-                        if mask in self.masks:
-                            self.masks[mask] += 1
-                        else:
-                            self.masks[mask] = 1
+                            if arg_options.patexc is not None:
+                                comp_count = 0
+                                for mask_pattern in arg_options.patexc:
+                                    if check_compatibility(mask, mask_pattern):
+                                        comp_count += 1
+                                if comp_count != 0:
+                                    continue
+
+                            if mask in self.masks:
+                                self.masks[mask] += 1
+                            else:
+                                self.masks[mask] = 1
 
             except OSError:
                 pass
@@ -149,6 +173,8 @@ class MaskSorter:
                     complexity *= len(string.ascii_uppercase)
                 elif charset == 's':
                     complexity *= 33
+                elif charset == 'h' or charset == 'H':
+                    complexity *= 16
                 elif charset == 'b':
                     complexity *= 256
 
@@ -203,7 +229,7 @@ class MaskSorter:
 class PasswordGenerator():
     '''Generates masks based on given password policies.'''
     def __init__(self):
-        self.charset = ["?l", "?u", "?d", "?s"]
+        self.charset = ["?l", "?u", "?d", "?s", "?h", "?H"]
         self.masks = {}
 
     def generate(self, arg_options):
@@ -217,7 +243,7 @@ class PasswordGenerator():
         if arg_options.charset4 is not None:
             self.charset.append("?4")
 
-        for iteration in range(arg_options.minlength, 9 if arg_options.maxlength > 9 else arg_options.maxlength + 1):
+        for iteration in range(arg_options.minlength, 8 if arg_options.maxlength > 8 else arg_options.maxlength + 1):
             for mask in itertools.product(self.charset, repeat=iteration):
                 joined_mask = ''.join(mask)
 
